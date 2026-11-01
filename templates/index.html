@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ThyroCare AI | Real Dataset Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"><script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<aside class="sidebar"><div class="brand"><div class="brand-icon">✚</div><div><b>ThyroCare <span>AI</span></b><small>HEALTH ANALYTICS</small></div></div>
+<nav><a class="active" href="#overview">▦ &nbsp; Overview</a><a href="#models">▥ &nbsp; Model Analytics</a><a href="#prediction">✚ &nbsp; Prediction</a><a href="#explainability">◈ &nbsp; Feature Insights</a><a href="#reports">⇩ &nbsp; Reports</a></nav>
+<div class="side-note"><div class="pulse"></div><b>Public Dataset</b><p>Historical anonymized records</p><small>Educational prototype only</small></div></aside>
+<main class="main">
+<header class="topbar"><div><div class="eyebrow">HEALTH INTELLIGENCE / DASHBOARD</div><h1>Thyroid Analytics</h1><p class="muted">Machine-learning analysis using a public thyroid dataset.</p></div><div class="top-pill"><span class="status-dot"></span> Local model dashboard</div></header>
+<section id="overview" class="stats-grid">
+<article class="stat-card"><div class="stat-label">DATASET RECORDS</div><div class="stat-value">{{ "{:,}".format(d.total) }}</div><div class="stat-foot">Real-world historical dataset rows</div></article>
+<article class="stat-card"><div class="stat-label">INPUT FEATURES</div><div class="stat-value">{{ d.features }}</div><div class="stat-foot">Selected demographic and lab features</div></article>
+<article class="stat-card"><div class="stat-label">POSITIVE LABELS</div><div class="stat-value">{{ "{:,}".format(d.positive) }}</div><div class="stat-foot">Diagnosis not marked negative</div></article>
+<article class="stat-card"><div class="stat-label">NEGATIVE LABELS</div><div class="stat-value">{{ "{:,}".format(d.negative) }}</div><div class="stat-foot">Diagnosis marked negative</div></article>
+</section>
+{% if prediction %}<section class="result-banner"><div class="result-symbol">✓</div><div><div class="eyebrow">MODEL OUTPUT</div><h2>{{ prediction.label }}</h2><p>Predicted target class: <b>{{ prediction["class"] }}</b>. This model output is not a medical diagnosis.</p></div></section>{% endif %}
+<section class="section-heading" id="models"><div><div class="eyebrow">PERFORMANCE</div><h2>Model comparison</h2></div><span class="subtle-tag">Held-out test set</span></section>
+<section class="panel"><div class="panel-head"><div><h3>Evaluation metrics by algorithm</h3><p>Compare accuracy, precision, recall and F1-score.</p></div><span class="chart-tag">%</span></div>
+<div class="chart-wrap chart-large"><canvas id="modelChart"></canvas></div>
+<div class="table-wrap"><table><thead><tr><th>Algorithm</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1-score</th></tr></thead><tbody>{% for name, score in d.results.items() %}<tr><td><b>{{ name }}</b>{% if name == d.best_name %}<span class="best-badge">BEST F1</span>{% endif %}</td><td>{{ score.accuracy }}%</td><td>{{ score.precision }}%</td><td>{{ score.recall }}%</td><td>{{ score.f1 }}%</td></tr>{% endfor %}</tbody></table></div>
+<div class="best-model"><span>Selected by highest F1-score</span><strong>{{ d.best_name }}</strong><b>{{ d.best.f1 }}% F1</b></div></section>
+<section class="two-col">
+<article class="panel"><div class="panel-head"><div><h3>Target class distribution</h3><p>Labels derived from the original diagnosis column.</p></div></div><div class="chart-wrap chart-medium"><canvas id="classChart"></canvas></div><div class="mini-legend"><span><i class="legend-dot one"></i> Negative: {{ d.negative }}</span><span><i class="legend-dot two"></i> Positive: {{ d.positive }}</span></div></article>
+<article class="panel"><div class="panel-head"><div><h3>Confusion matrix</h3><p>Best-F1 model; rows = actual, columns = predicted.</p></div></div><div class="matrix"><div class="matrix-axis"></div><div class="matrix-col">Predicted 0</div><div class="matrix-col">Predicted 1</div><div class="matrix-row">Actual 0</div><div class="matrix-cell">{{ d.cm[0][0] }}<small>Correct negative</small></div><div class="matrix-cell miss">{{ d.cm[0][1] }}<small>False positive</small></div><div class="matrix-row">Actual 1</div><div class="matrix-cell miss">{{ d.cm[1][0] }}<small>False negative</small></div><div class="matrix-cell">{{ d.cm[1][1] }}<small>Correct positive</small></div></div><div class="notice">Historical dataset results do not establish clinical reliability.</div></article>
+</section>
+<section class="two-col" id="explainability">
+<article class="panel"><div class="panel-head"><div><h3>Top feature importance</h3><p>Decision Tree importance scores, not medical causes.</p></div></div><div class="chart-wrap chart-medium"><canvas id="featureChart"></canvas></div></article>
+<article class="panel"><div class="panel-head"><div><h3>ROC curve</h3><p>Best-F1 model on held-out test data.</p></div><span class="chart-tag">AUC {{ d.roc.auc }}</span></div><div class="chart-wrap chart-medium"><canvas id="rocChart"></canvas></div><div class="notice">This is an academic screening prototype and must not be used for diagnosis or treatment.</div></article>
+</section>
+<section class="section-heading" id="prediction"><div><div class="eyebrow">TRY THE MODEL</div><h2>Prediction form</h2><p class="muted">Use values consistent with the dataset's feature definitions and units.</p></div></section>
+<section class="panel"><form method="post" action="/"><div class="form-grid">
+{% for field in fields %}<label class="field"><span>{{ field.label }}</span>
+{% if field.kind == "select" %}<select name="{{ field.name }}">{% for option in field.options %}<option value="{{ option }}" {% if entered.get(field.name, option == 'Unknown') == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+{% else %}<input type="number" step="{{ field.step }}" name="{{ field.name }}" value="{{ entered.get(field.name, '') }}" placeholder="Enter {{ field.label }}" {% if field.name == 'age' %}min="0" max="120"{% endif %}>{% endif %}
+</label>{% endfor %}
+</div><div class="form-actions"><button class="primary-btn" type="submit">Run prediction <span>→</span></button><span class="muted small">Leave unknown numeric values blank if needed.</span></div></form></section>
+<section class="section-heading" id="reports"><div><div class="eyebrow">EXPORT</div><h2>Download reports</h2></div></section>
+<section class="report-grid"><a class="report-card" href="{{ url_for('download_csv') }}"><div class="report-icon">CSV</div><div><b>Model metrics CSV</b><p>Export evaluation table</p></div><span>↓</span></a><a class="report-card" href="{{ url_for('download_pdf') }}"><div class="report-icon pdf">PDF</div><div><b>Model report PDF</b><p>Download summary report</p></div><span>↓</span></a></section>
+<footer>ThyroCare AI · College project prototype · Not for clinical diagnosis</footer>
+</main>
+<script>
+const modelNames={{ d.results.keys()|list|tojson }}, metrics={{ d.results|tojson }}, featureNames={{ d.importance_names|tojson }}, featureValues={{ d.importance_values|tojson }}, rocData={{ d.roc|tojson }};
+Chart.defaults.font.family='Inter, sans-serif'; Chart.defaults.color='#718096'; Chart.defaults.plugins.legend.labels.usePointStyle=true;
+new Chart(document.getElementById('modelChart'),{type:'bar',data:{labels:modelNames,datasets:[
+{label:'Accuracy',data:modelNames.map(n=>metrics[n].accuracy),backgroundColor:'#3B82F6',borderRadius:5},
+{label:'Precision',data:modelNames.map(n=>metrics[n].precision),backgroundColor:'#14B8A6',borderRadius:5},
+{label:'Recall',data:modelNames.map(n=>metrics[n].recall),backgroundColor:'#8B5CF6',borderRadius:5},
+{label:'F1-score',data:modelNames.map(n=>metrics[n].f1),backgroundColor:'#F59E0B',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,max:100,title:{display:true,text:'Score (%)'}},x:{grid:{display:false}}},plugins:{legend:{position:'bottom'}}}});
+new Chart(document.getElementById('classChart'),{type:'doughnut',data:{labels:['Negative','Positive'],datasets:[{data:[{{ d.negative }},{{ d.positive }}],backgroundColor:['#3B82F6','#14B8A6'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom'}}}});
+new Chart(document.getElementById('featureChart'),{type:'bar',data:{labels:featureNames,datasets:[{label:'Importance',data:featureValues,backgroundColor:'#14B8A6',borderRadius:5}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,scales:{x:{beginAtZero:true},y:{grid:{display:false}}},plugins:{legend:{display:false}}}});
+new Chart(document.getElementById('rocChart'),{type:'line',data:{datasets:[{label:'ROC curve',data:rocData.fpr.map((x,i)=>({x:x,y:rocData.tpr[i]})),borderColor:'#3B82F6',backgroundColor:'rgba(59,130,246,.12)',fill:true,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,parsing:false,scales:{x:{type:'linear',min:0,max:1,title:{display:true,text:'False positive rate'}},y:{min:0,max:1,title:{display:true,text:'True positive rate'}}},plugins:{legend:{position:'bottom'}}}});
+</script></body></html>
